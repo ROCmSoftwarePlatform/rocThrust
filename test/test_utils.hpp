@@ -130,12 +130,31 @@ void test_event_wait(Event&& e)
   ASSERT_EQ(true, e.ready());
 }
 
-std::vector<size_t> get_sizes()
+bool is_large(size_t size) { return size > (1 << 20) - 123; }
+
+template <typename T = size_t>
+std::vector<size_t> get_sizes(size_t count = 0)
 {
     std::vector<size_t> sizes = {
         0, 1, 2, 12, 63, 64, 211, 256, 344,
         1024, 2048, 5096, 34567, (1 << 17) - 1220, 1000000, (1 << 20) - 123
     };
+    if(large_tests && count>0)
+    {
+        size_t free, total;
+        hipError_t err = hipMemGetInfo(&free, &total);
+
+        if(err != hipSuccess)
+            throw std::runtime_error{
+                (err == hipErrorInvalidDevice ?
+                    "hipMemGetInfo: hipErrorInvalidDevice" :
+                    "hipMemGetInfo: hipErrorInvalidValue")
+                };
+
+        constexpr double capacity = 0.49;
+        sizes.push_back(size_t(free * capacity / (sizeof(T) * count)));
+    }
+
     return sizes;
 }
 
@@ -166,27 +185,154 @@ inline auto get_random_data(size_t size, T min, T max, int seed) ->
     typename std::enable_if<rocprim::is_integral<T>::value && !std::is_same<T, bool>::value,
                             thrust::host_vector<T>>::type
 {
-    std::random_device               rd;
-    std::default_random_engine       gen(rd());
-    gen.seed(seed);
-    std::uniform_int_distribution<T> distribution(min, max);
     thrust::host_vector<T>           data(size);
-    std::generate(data.begin(), data.end(), [&]() { return distribution(gen); });
+
+    #ifdef LARGE_TEST_ENABLE
+      rocrand_generator rand_gen;
+      rocrand_create_generator(&rand_gen,ROCRAND_RNG_PSEUDO_DEFAULT);
+      rocrand_set_seed(rand_gen,seed);
+      thrust::device_vector<T>           d_data(size);
+      auto num_bytes = (data.end() - data.begin())*sizeof(T);
+      rocrand_generate_char(rand_gen,(uchar *)d_data.data().get(),num_bytes);
+      data = d_data;
+    #else
+      std::random_device               rd;
+      std::default_random_engine       gen(rd());
+      gen.seed(seed);
+      std::uniform_int_distribution<T> distribution(min, max);
+      std::generate(data.begin(), data.end(), [&]() { return distribution(gen); });
+    #endif
+
     return data;
 }
 
 template <class T>
 inline auto get_random_data(size_t size, T min, T max, int seed) ->
-    typename std::enable_if<rocprim::is_floating_point<T>::value, thrust::host_vector<T>>::type
+    typename std::enable_if<std::is_same<::rocprim::half,T>::value, thrust::host_vector<T>>::type
 {
+    thrust::host_vector<T>            data(size);
+
+    #ifdef LARGE_TEST_ENABLE
+      rocrand_generator rand_gen;
+      rocrand_create_generator(&rand_gen,ROCRAND_RNG_PSEUDO_DEFAULT);
+      rocrand_set_seed(rand_gen,seed);
+
+      thrust::device_vector<T>          d_data(size);
+      rocrand_generate_uniform_half(rand_gen,d_data.data().get(),size);
+      data = d_data;
+    #else
+      std::random_device                rd;
+      std::default_random_engine        gen(rd());
+      gen.seed(seed);
+      std::uniform_real_distribution<T> distribution(min, max);
+      std::generate(data.begin(), data.end(), [&]() { return distribution(gen); });
+    #endif
+
+    return data;
+}
+
+
+template <class T>
+inline auto get_random_data(size_t size, T min, T max, int seed) ->
+    typename std::enable_if<std::is_same<float,T>::value, thrust::host_vector<T>>::type
+{
+  thrust::host_vector<T>            data(size);
+  #ifdef LARGE_TEST_ENABLE
+    rocrand_generator rand_gen;
+    rocrand_create_generator(&rand_gen,ROCRAND_RNG_PSEUDO_DEFAULT);
+    rocrand_set_seed(rand_gen,seed);
+    thrust::device_vector<T>          d_data(size);
+    rocrand_generate_uniform(rand_gen,d_data.data().get(),size);
+    data = d_data;
+  #else
     std::random_device                rd;
     std::default_random_engine        gen(rd());
     gen.seed(seed);
     std::uniform_real_distribution<T> distribution(min, max);
-    thrust::host_vector<T>            data(size);
     std::generate(data.begin(), data.end(), [&]() { return distribution(gen); });
+  #endif
+
+  return data;
+}
+
+
+template <class T>
+inline auto get_random_data(size_t size, T min, T max, int seed) ->
+    typename std::enable_if<std::is_same<double,T>::value, thrust::host_vector<T>>::type
+{
+    thrust::host_vector<T>            data(size);
+    #ifdef LARGE_TEST_ENABLE
+      rocrand_generator rand_gen;
+      rocrand_create_generator(&rand_gen,ROCRAND_RNG_PSEUDO_DEFAULT);
+      rocrand_set_seed(rand_gen,seed);
+
+      thrust::device_vector<T>          d_data(size);
+      rocrand_generate_uniform_double(rand_gen,d_data.data().get(),size);
+      data = d_data;
+    #else
+      std::random_device                rd;
+      std::default_random_engine        gen(rd());
+      gen.seed(seed);
+      std::uniform_real_distribution<T> distribution(min, max);
+      std::generate(data.begin(), data.end(), [&]() { return distribution(gen); });
+    #endif
     return data;
 }
+
+template<class T>
+struct precision_threshold
+{
+    static constexpr float percentage = 0.01f;
+};
+
+template<>
+struct precision_threshold<float>
+{
+    static constexpr float percentage = 0.01f;
+};
+
+template<>
+struct precision_threshold<rocprim::half>
+{
+    static constexpr float percentage = 0.075f;
+};
+
+template<>
+struct precision_threshold<int>
+{
+    static constexpr float percentage = 0;
+};
+
+template<>
+struct precision_threshold<unsigned int>
+{
+    static constexpr float percentage = 0;
+};
+
+template<>
+struct precision_threshold<long>
+{
+    static constexpr float percentage = 0;
+};
+
+template<>
+struct precision_threshold<unsigned long>
+{
+    static constexpr float percentage = 0;
+};
+
+template<>
+struct precision_threshold<short>
+{
+    static constexpr float percentage = 0;
+};
+
+template<>
+struct precision_threshold<unsigned short>
+{
+    static constexpr float percentage = 0;
+};
+
 
 template <class T>
 struct custom_compare_less
@@ -585,16 +731,3 @@ void test_future_value_retrieval(Future&& f, decltype(f.extract()) &return_value
 
   return_value = r2;
 }
-
-template<class T>
-struct precision_threshold
-{
-    static constexpr float percentage = 0.01f;
-};
-
-template<>
-struct precision_threshold<rocprim::half>
-{
-    static constexpr float percentage = 0.075f;
-};
-

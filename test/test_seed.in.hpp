@@ -18,14 +18,21 @@
 #ifndef TEST_SEED_HPP_
 #define TEST_SEED_HPP_
 
-#include <random>
+#if ${LARGE_TESTS_BOOLEAN}
+  #define LARGE_TEST_ENABLE
+  #include "rocrand.hpp"
+#endif
 #include <initializer_list>
 
 using random_engine = std::minstd_rand;
 using seed_type = random_engine::result_type;
 
+
+
 static constexpr size_t rng_seed_count = ${RNG_SEED_COUNT};
 static const std::initializer_list<uint32_t> prng_seeds = { ${PRNG_SEEDS_INITIALIZER} };
 static constexpr seed_type seed_value_addition = 100;
+
+static constexpr bool large_tests = ${LARGE_TESTS_BOOLEAN};
 
 #endif // TEST_SEED_HPP_

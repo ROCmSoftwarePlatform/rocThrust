@@ -374,7 +374,7 @@ TYPED_TEST(ScanVariablesTests, TestScanWithOperator)
 
     SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-    for(auto size : get_sizes())
+    for(auto size : get_sizes<T>(4))
     {
         SCOPED_TRACE(testing::Message() << "with size= " << size);
 
@@ -410,7 +410,7 @@ TYPED_TEST(ScanVariablesTests, TestScanWithOperatorToDiscardIterator)
 
     SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-    for(auto size : get_sizes())
+    for(auto size : get_sizes<T>(4))
     {
         SCOPED_TRACE(testing::Message() << "with size= " << size);
 
@@ -457,7 +457,7 @@ TYPED_TEST(ScanVariablesTests, TestScan)
 
     SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-    for(auto size : get_sizes())
+    for(auto size : get_sizes<T>(4))
     {
         SCOPED_TRACE(testing::Message() << "with size= " << size);
 
@@ -476,17 +476,26 @@ TYPED_TEST(ScanVariablesTests, TestScan)
             thrust::inclusive_scan(d_input.begin(), d_input.end(), d_output.begin());
 
             thrust::host_vector<T> h_output_d(d_output);
-            ASSERT_EQ(h_output_d, h_output);
+            for(size_t index = 0; index < h_output.size(); index++)
+            {
+              ASSERT_NEAR(h_output[index],h_output_d[index],std::abs(h_output[index]*precision_threshold<T>::percentage));
+            }
 
             thrust::exclusive_scan(h_input.begin(), h_input.end(), h_output.begin());
             thrust::exclusive_scan(d_input.begin(), d_input.end(), d_output.begin());
             h_output_d = d_output;
-            ASSERT_EQ(h_output_d, h_output);
+            for(size_t index = 0; index < h_output.size(); index++)
+            {
+              ASSERT_NEAR(h_output[index],h_output_d[index],std::abs(h_output[index]*precision_threshold<T>::percentage));
+            }
 
             thrust::exclusive_scan(h_input.begin(), h_input.end(), h_output.begin(), (T)11);
             thrust::exclusive_scan(d_input.begin(), d_input.end(), d_output.begin(), (T)11);
             h_output_d = d_output;
-            ASSERT_EQ(h_output_d, h_output);
+            for(size_t index = 0; index < h_output.size(); index++)
+            {
+              ASSERT_NEAR(h_output[index],h_output_d[index],std::abs(h_output[index]*precision_threshold<T>::percentage));
+            }
 
             // in-place scans
             h_output = h_input;
@@ -494,14 +503,19 @@ TYPED_TEST(ScanVariablesTests, TestScan)
             thrust::inclusive_scan(h_output.begin(), h_output.end(), h_output.begin());
             thrust::inclusive_scan(d_output.begin(), d_output.end(), d_output.begin());
             h_output_d = d_output;
-            ASSERT_EQ(h_output_d, h_output);
-
+            for(size_t index = 0; index < h_output.size(); index++)
+            {
+              ASSERT_NEAR(h_output[index],h_output_d[index],std::abs(h_output[index]*precision_threshold<T>::percentage));
+            }
             h_output = h_input;
             d_output = d_input;
             thrust::exclusive_scan(h_output.begin(), h_output.end(), h_output.begin());
             thrust::exclusive_scan(d_output.begin(), d_output.end(), d_output.begin());
             h_output_d = d_output;
-            ASSERT_EQ(h_output_d, h_output);
+            for(size_t index = 0; index < h_output.size(); index++)
+            {
+              ASSERT_NEAR(h_output[index],h_output_d[index],std::abs(h_output[index]*precision_threshold<T>::percentage));
+            }
         }
     }
 }
@@ -512,7 +526,7 @@ TYPED_TEST(ScanVariablesTests, TestScanToDiscardIterator)
 
     SCOPED_TRACE(testing::Message() << "with device_id= " << test::set_device_from_ctest());
 
-    for(auto size : get_sizes())
+    for(auto size : get_sizes<T>(4))
     {
         SCOPED_TRACE(testing::Message() << "with size= " << size);
 

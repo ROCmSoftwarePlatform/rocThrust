@@ -41,7 +41,7 @@ variables:
   before_script:
     - $SUDO_CMD apt update -qq
     # | Used in the script    | Build tools | Fetch from https:// | rocminfo calls lsmod
-    - $SUDO_CMD apt install -y -qq libidn11 wget tar xz-utils bzip2 libnuma-dev libunwind-dev git build-essential pkg-config ninja-build ca-certificates kmod
+    - $SUDO_CMD apt install -y -qq libidn11 wget tar xz-utils bzip2 libnuma-dev libunwind-dev git build-essential pkg-config ninja-build ca-certificates kmod libtbb-dev
     # Fetch CMake only if the cache has not been restored
     - if [ ! -d $CMAKE_MINIMUM_PATH ]; then mkdir -p $CMAKE_MINIMUM_PATH; wget --no-check-certificate --quiet -O - $CMAKE_MINIMUM_URL | tar --strip-components=1 -xz -C $CMAKE_MINIMUM_PATH
     - fi
@@ -65,7 +65,7 @@ variables:
   before_script:
     - $SUDO_CMD apt update -qq
     # | Used in the script    | Build tools | Fetch from https:// | rocminfo calls lsmod
-    - $SUDO_CMD apt install -y -qq wget tar xz-utils bzip2 libnuma-dev libunwind-dev git build-essential pkg-config ninja-build ca-certificates kmod
+    - $SUDO_CMD apt install -y -qq wget tar xz-utils bzip2 libnuma-dev libunwind-dev git build-essential pkg-config ninja-build ca-certificates kmod libtbb-dev
     # Fetch CMake only if the cache has not been restored
     - if [ ! -d $CMAKE_LATEST_PATH ]; then mkdir -p $CMAKE_LATEST_PATH; wget --no-check-certificate --quiet -O - $CMAKE_LATEST_URL | tar --strip-components=1 -xz -C $CMAKE_LATEST_PATH;
     - fi;
@@ -96,6 +96,7 @@ build:cmake-latest:
       -D BUILD_TEST=ON
       -D BUILD_EXAMPLES=ON
       -D BUILD_BENCHMARKS=ON
+      -D LARGE_TEST=ON
       -D AMDGPU_TARGETS="gfx803;gfx900;gfx906"
       -D AMDGPU_TEST_TARGETS="gfx803;gfx900;gfx906"
       -D RNG_SEED_COUNT=$rng_seed_count
@@ -109,6 +110,7 @@ build:cmake-latest:
     - $BUILD_LATEST_DIR/test/*
     - $BUILD_LATEST_DIR/testing/*
     - $BUILD_LATEST_DIR/gtest/*
+    - $BUILD_LATEST_DIR/deps/*
     - $BUILD_LATEST_DIR/CMakeCache.txt
     - $BUILD_LATEST_DIR/CTestTestfile.cmake
     exclude:
@@ -131,6 +133,7 @@ build:cmake-minimum:
       -D BUILD_TEST=ON
       -D BUILD_EXAMPLES=ON
       -D BUILD_BENCHMARKS=ON
+      -D LARGE_TEST=OFF
       -D DISABLE_WERROR=OFF
       -B $BUILD_MINIMUM_DIR
       ../../.

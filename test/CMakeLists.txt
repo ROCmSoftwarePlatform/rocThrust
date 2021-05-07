@@ -21,6 +21,11 @@ else() # Workaround for not having string(JOIN) and list(JOIN)
   message(${PRNG_SEEDS_INITIALIZER})
 endif()
 
+if(LARGE_TEST)
+  set(LARGE_TESTS_BOOLEAN true)
+else()
+  set(LARGE_TESTS_BOOLEAN false)
+endif()
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/test_seed.in.hpp
     ${CMAKE_CURRENT_BINARY_DIR}/test_seed.hpp
@@ -34,19 +39,31 @@ function(add_rocthrust_test TEST)
         PUBLIC
             ${GTEST_INCLUDE_DIRS}
             ${CMAKE_CURRENT_BINARY_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    target_link_libraries(${TEST_TARGET}
-        PRIVATE
-            rocthrust
-            roc::rocprim_hip
-            ${GTEST_BOTH_LIBRARIES}
-    )
-    foreach(amdgpu_target ${AMDGPU_TARGETS})
+    if(LARGE_TEST)
         target_link_libraries(${TEST_TARGET}
             PRIVATE
-                --amdgpu-target=${amdgpu_target}
+                hip::device
+                rocthrust
+                roc::rocprim_hip
+                ${GTest_IMPORTED_targets}
+                roc::rocrand
+                TBB::tbb
         )
-    endforeach()
+    else()
+        target_link_libraries(${TEST_TARGET}
+            PRIVATE
+                hip::device
+                rocthrust
+                roc::rocprim_hip
+                ${GTest_IMPORTED_targets}
+        )
+    endif()
+    target_compile_definitions(${TEST_TARGET}
+        INTERFACE
+            THRUST_HOST_SYSTEM=3 # THRUST_HOST_SYSTEM_TBB
+    )
     set_target_properties(${TEST_TARGET}
         PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/"
